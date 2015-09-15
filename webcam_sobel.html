@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>MATSE</title>
+	<script src="jquery-1.11.3.min.js"></script>
+</head>
+<body>
+	<video id=video width="200" height="150" autoplay="true"></video>
+	<canvas id="canvas"></canvas>
+	<button id="btn_start">START</button>
+	<button id="btn_stop">STOP</button>
+	<script>
+		var render_id;
+		var WIDTH = 100;
+		var HEIGHT = 75;
+		var FIRST_BIN_VALUE = 21;
+		var LAST_BIN_VALUE = 30;
+		
+		var NUMBER_OF_BINS = LAST_BIN_VALUE - FIRST_BIN_VALUE+1;
+		
+		//var binWidth = 1;
+		// compute gradient using Sobel kernel [1 2 1] * [-1 0 1]^T
+		// dst: [gx,gy,...]
+		// sobel_derivatives: 
+		var transform = function(components) {
+			var gxgy = new Uint32Array(components.length / 4);
+			
+			var w = WIDTH, h = HEIGHT;
+			var dstep = w, x1=0, a,b,c,d,e,f;
+			var srow0=0,srow1=0,srow2=0,drow=0;
+			var trow0,trow1;
+
+			//dst.resize(w, h, 2); // 2 channel output gx, gy
+
+			var img = new Uint8Array(components.length / 4);
+			for (var i = 0; i < components.length; i += 4) {
+				//var x = WIDTH - (((i /4) % WIDTH) + 1);
+				//var y = ((i / 4) / WIDTH)|0;
+				
+				img[i/4] = (components[i] + components[i+1] + components[i+2]) / 3;
+			}
+
+
+			var trow0 = new Float32Array((w+2)<<2);
+			var trow1 = new Float32Array((w+2)<<2);
+
+			
+
+			var  x=0, y=0;
+			for(; y < h; ++y, srow1+=w) {
+				srow0 = ((y > 0 ? y-1 : 1)*w)|0;
+				srow2 = ((y < h-1 ? y+1 : h-2)*w)|0;
+				drow = (y*dstep)|0;
+				// do vertical convolution
+				for(x = 0, x1 = 1; x <= w-2; x+=2, x1+=2) {
+					a = img[srow0+x], b = img[srow2+x];
+					trow0[x1] = ( (a + b) + (img[srow1+x]*2) );
+					trow1[x1] = ( b - a );
+					//
+					a = img[srow0+x+1], b = img[srow2+x+1];
+					trow0[x1+1] = ( (a + b) + (img[srow1+x+1]*2) );
+					trow1[x1+1] = ( b - a );
+				}
+				for(; x < w; ++x, ++x1) {
+					a = img[srow0+x], b = img[srow2+x];
+					trow0[x1] = ( (a + b) + (img[srow1+x]*2) );
+					trow1[x1] = ( b - a );
+				}
+				// make border
+				x = (w + 1)|0;
+				trow0[0] = trow0[1]; trow0[x] = trow0[w];
+				trow1[0] = trow1[1]; trow1[x] = trow1[w];
+				// do horizontal convolution, interleave the results and store them
+				for(x = 0; x <= w-4; x+=4) {
+					a = trow1[x+2], b = trow1[x+1], c = trow1[x+3], d = trow1[x+4],
+					e = trow0[x+2], f = trow0[x+3];
+					gxgy[drow++] = Math.sqrt(( e - trow0[x] ) * ( e - trow0[x] ) + ( a + trow1[x] + b*2 ) * ( a + trow1[x] + b*2 ));
+					
+					gxgy[drow++] = Math.sqrt(( f - trow0[x+1] )*( f - trow0[x+1] )+( c + b + a*2 )*( c + b + a*2 ));
+
+					gxgy[drow++] = Math.sqrt(( trow0[x+4] - e ) * ( trow0[x+4] - e ) + ( d + a + c*2 ) * ( d + a + c*2 ));
+					
+					gxgy[drow++] = Math.sqrt(( trow0[x+5] - f ) * ( trow0[x+5] - f ) + ( trow1[x+5] + c + d*2 ) * ( trow1[x+5] + c + d*2 ));
+					
+				}
+				for(; x < w; ++x) {
+					gxgy[drow++] = Math.sqrt(( trow0[x+2] - trow0[x] ) * ( trow0[x+2] - trow0[x] ) + ( trow1[x+2] + trow1[x] + trow1[x+1]*2 ) * ( trow1[x+2] + trow1[x] + trow1[x+1]*2 ));
+					
+				}
+			}
+			//jsfeat.cache.put_buffer(buf0_node);
+			//jsfeat.cache.put_buffer(buf1_node);
+			
+			return gxgy;
+		};
+		
+		var getCoordinates = function (index, width, height) {
+			var coords = { x: 0, y: 0 };
+			
+			coords.x = index % width;
+			coords.y = (index / width) | 0;
+			
+			return coords;
+		};
+		
+		var checkDist = function (dist) {
+			return dist < FIRST_BIN_VALUE || dist >= LAST_BIN_VALUE + 1/*binwidth*/;
+		};
+		
+		var getBinNr = function (dist) {
+			return ((dist - FIRST_BIN_VALUE)) | 0;
+		};
+		
+		var putToHisto = function (histo, dist, weight) {
+			if (checkDist(dist))
+				return -1;
+			
+			return histo[getBinNr(dist)] += weight;
+		};
+		
+		
+		
+		var houghTransform  = function (components, width, height) {
+			var gsPixels = transform(components);
+			
+						
+			var maximum = 0;
+			var hotCircle = {x: 0, y: 0, radius: 10};
+			
+			for (var i = 0; i < gsPixels.length; i++) {
+				components[i*4] = gsPixels[i];
+				components[i*4+1] = gsPixels[i];
+				components[i*4+2] = gsPixels[i];
+			}
+			
+			for (var x_i = 0; x_i < WIDTH; x_i++) {
+				for (var y_i = 0; y_i < HEIGHT; y_i++) {
+					
+				
+					var histo = new Uint32Array(NUMBER_OF_BINS);
+					var x_j = x_i - LAST_BIN_VALUE;
+					if (x_j < 0) {
+						x_j = 0;
+					}
+					var x_j_max = x_i + LAST_BIN_VALUE;
+					if (x_j_max > WIDTH - 1) {
+						x_j_max = WIDTH - 1;
+					}
+					var y_j = y_i - LAST_BIN_VALUE;
+					if (y_j < 0) {
+						y_j = 0;
+					}
+					var y_j_max = y_i + LAST_BIN_VALUE;
+					if (y_j_max > HEIGHT - 1) {
+						y_j_max = HEIGHT - 1;
+					}
+					for (; x_j < x_j_max; x_j++) {
+						
+						for (y_j = 0; y_j < y_j_max; y_j++) {
+							
+							var dist = Math.sqrt(Math.pow(x_i - x_j, 2) + Math.pow(y_i - y_j, 2)) | 0;
+							var tmp = putToHisto(histo, dist, gsPixels[x_j + y_j * WIDTH]);
+							if (tmp > maximum) {
+								maximum = tmp;
+								hotCircle = { x: x_i, y: y_i };
+								hotCircle.radius = dist;
+							}
+						}
+					}
+					
+				}
+			}
+			
+			return hotCircle;
+		};
+		
+		var drawCircle = function (circle, components, width, height) {
+			var left = circle.x - circle.radius;
+			var right = circle.x + circle.radius;
+			if (left < 0)
+				left = 0;
+			if (right > width - 1)
+				right = width - 1;
+			for (var x = left; x <= right; x++) {
+				var b = Math.sqrt(Math.pow(circle.radius, 2) - Math.pow(circle.x - x, 2)) | 0;
+				var address = x * 4 + (circle.y + b) * 4 * WIDTH;
+				components[address + 2] = 255;
+				components[address] = components[address + 1] = 0;
+				address = x * 4 + (circle.y - b) * 4 * WIDTH;
+				components[address + 2] = 255;
+				components[address] = components[address + 1] = 0;
+			}
+		};
+	
+		$(function () {
+			var videoElement = $('#video').get(0);
+			var canvasElement = $('#canvas').get(0);
+			canvasElement.width = WIDTH;
+			canvasElement.height = HEIGHT;
+			var context = canvasElement.getContext('2d');
+			context.clearRect(0, 0, WIDTH, HEIGHT);
+			var render = function () {
+				var start = new Date().getTime();
+				context.drawImage(videoElement, 0, 0, WIDTH, HEIGHT);
+				var imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
+				var circle = houghTransform(imageData.data, WIDTH, HEIGHT);
+				//drawCircle(circle, imageData.data, WIDTH, HEIGHT);
+				context.putImageData(imageData, 0, 0);
+				context.beginPath();
+				context.strokeStyle = '#f00';
+				context.arc(circle.x, circle.y, circle.radius, 0, 2*Math.PI);
+				context.stroke();
+				render_id = mozRequestAnimationFrame(render);
+				var time = new Date().getTime();
+				console.log(time - start);
+			};
+			$('#btn_start').click(function () {
+				navigator.mozGetUserMedia({
+					video: true
+				},
+				function (stream) {
+					console.log('SUCCESS');
+					var url = URL.createObjectURL(stream);
+					videoElement.src = url;
+					mozRequestAnimationFrame(render);
+				},
+				function () {
+					alert('NO SUCCESS');
+				});
+			});
+			$('#btn_stop').click(function () {
+				cancelAnimationFrame(render_id);
+			});
+		});
+	</script>
+</body>	
+</html>
