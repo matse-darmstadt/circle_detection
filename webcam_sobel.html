@@ -3,6 +3,7 @@
 <head>
 	<title>MATSE</title>
 	<script src="jquery-1.11.3.min.js"></script>
+	<meta charset="UTF-8">
 </head>
 <body>
 	<video id=video width="200" height="150" autoplay="true"></video>
@@ -125,7 +126,7 @@
 			
 						
 			var maximum = 0;
-			var hotCircle = {x: 0, y: 0, radius: 10};
+			var hotCircle = {x: 0, y: 0, radius: 0};
 			
 			for (var i = 0; i < gsPixels.length; i++) {
 				components[i*4] = gsPixels[i];
@@ -138,22 +139,28 @@
 					// x_j, y_j -> dx, dy
 				
 					var histo = new Uint32Array(NUMBER_OF_BINS);
+					
+					// what to put in there?
 					var dx_min, dx_max;
 					var dy_min, dy_max;
 					
-					var d_min = 8;
-					var d_max = 10;
 					
-					for (var x_j = x_i - d_max; x_j < x_i + d_max; x_j++) {
-						if (x_j == x_i - d_min) {
-							x_j = x_i + d_min;
+					
+					
+					for (var x_j = x_i - dx_max; x_j < x_i + dx_max; x_j++) {
+						
+						if (x_j == x_i - dx_min) {
+							x_j = x_i + dx_min;
 						}
-						for (var y_j = y_i - d_max; y_j < y_j + d_max; y_j++) {
-							if (y_j == y_i - d_min) {
-								y_j = y_i + d_min;
+						for (var y_j = y_i - dy_max; y_j < y_i + dy_max; y_j++) {
+							if (y_j == y_i - dy_min) {
+								y_j = y_i + dy_min;
 							}
+							
 							var dist = Math.sqrt(Math.pow(x_i - x_j, 2) + Math.pow(y_i - y_j, 2)) | 0;
-							var tmp = putToHisto(histo, dist, gsPixels[x_j + y_j * WIDTH]);
+							if (!((x_j < 0) || (y_j < 0))) {
+								var tmp = putToHisto(histo, dist, gsPixels[x_j + y_j * WIDTH]);
+							}
 							if (tmp > maximum) {
 								maximum = tmp;
 								hotCircle = { x: x_i, y: y_i };
