@@ -135,29 +135,20 @@
 			
 			for (var x_i = 0; x_i < WIDTH; x_i++) {
 				for (var y_i = 0; y_i < HEIGHT; y_i++) {
-					
+					// x_j, y_j -> dx, dy
 				
 					var histo = new Uint32Array(NUMBER_OF_BINS);
-					var x_j = x_i - LAST_BIN_VALUE;
-					if (x_j < 0) {
-						x_j = 0;
-					}
-					var x_j_max = x_i + LAST_BIN_VALUE;
-					if (x_j_max > WIDTH - 1) {
-						x_j_max = WIDTH - 1;
-					}
-					var y_j = y_i - LAST_BIN_VALUE;
-					if (y_j < 0) {
-						y_j = 0;
-					}
-					var y_j_max = y_i + LAST_BIN_VALUE;
-					if (y_j_max > HEIGHT - 1) {
-						y_j_max = HEIGHT - 1;
-					}
-					for (; x_j < x_j_max; x_j++) {
-						
-						for (y_j = 0; y_j < y_j_max; y_j++) {
-							
+					var dx_min, dx_max;
+					var dy_min, dy_max;
+					
+					for (var x_j = x_i - dx_max; x_j < x_i + dx_max; x_j++) {
+						if (x_j == x_i - dx_min) {
+							x_j = x_i + dx_min;
+						}
+						for (var y_j = y_i - dy_max; y_j < y_j + dy_max; y_j++) {
+							if (y_j == y_i - dy_min) {
+								y_j = y_i + dy_min;
+							}
 							var dist = Math.sqrt(Math.pow(x_i - x_j, 2) + Math.pow(y_i - y_j, 2)) | 0;
 							var tmp = putToHisto(histo, dist, gsPixels[x_j + y_j * WIDTH]);
 							if (tmp > maximum) {
