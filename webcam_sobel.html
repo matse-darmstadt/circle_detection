@@ -12,12 +12,12 @@
 	<button id="btn_stop">STOP</button>
 	<script>
 		var render_id;
-		var WIDTH = 100;
-		var HEIGHT = 75;
-		var FIRST_BIN_VALUE = 21;
-		var LAST_BIN_VALUE = 30;
+		var WIDTH = 200;
+		var HEIGHT = 150;
+		var FIRST_BIN_VALUE = 20;
+		var LAST_BIN_VALUE = 25;
 		
-		var NUMBER_OF_BINS = LAST_BIN_VALUE - FIRST_BIN_VALUE+1;
+		var NUMBER_OF_BINS = LAST_BIN_VALUE - FIRST_BIN_VALUE + 1;
 		
 		//var binWidth = 1;
 		// compute gradient using Sobel kernel [1 2 1] * [-1 0 1]^T
@@ -104,18 +104,11 @@
 			return coords;
 		};
 		
-		var checkDist = function (dist) {
-			return dist < FIRST_BIN_VALUE || dist >= LAST_BIN_VALUE + 1/*binwidth*/;
-		};
-		
 		var getBinNr = function (dist) {
 			return ((dist - FIRST_BIN_VALUE)) | 0;
 		};
 		
 		var putToHisto = function (histo, dist, weight) {
-			if (checkDist(dist))
-				return -1;
-			
 			return histo[getBinNr(dist)] += weight;
 		};
 		
@@ -128,39 +121,34 @@
 			var maximum = 0;
 			var hotCircle = {x: 0, y: 0, radius: 0};
 			
+			// replace frame with a sobel transformed b/w pic
 			for (var i = 0; i < gsPixels.length; i++) {
 				components[i*4] = gsPixels[i];
 				components[i*4+1] = gsPixels[i];
 				components[i*4+2] = gsPixels[i];
 			}
 			
-			for (var x_i = 0; x_i < WIDTH; x_i++) {
-				for (var y_i = 0; y_i < HEIGHT; y_i++) {
+			for (var x_i = LAST_BIN_VALUE; x_i != WIDTH - LAST_BIN_VALUE + 1; ++x_i) {
+				for (var y_i = LAST_BIN_VALUE; y_i != HEIGHT - LAST_BIN_VALUE + 1; ++y_i) {
 					// x_j, y_j -> dx, dy
 				
 					var histo = new Uint32Array(NUMBER_OF_BINS);
 					
-					// what to put in there?
-					var dx_min, dx_max;
-					var dy_min, dy_max;
-					
-					
-					
-					
-					for (var x_j = x_i - dx_max; x_j < x_i + dx_max; x_j++) {
+					for (var x_j = - LAST_BIN_VALUE; x_j != 1; ++x_j) {
 						
-						if (x_j == x_i - dx_min) {
-							x_j = x_i + dx_min;
-						}
-						for (var y_j = y_i - dy_max; y_j < y_i + dy_max; y_j++) {
-							if (y_j == y_i - dy_min) {
-								y_j = y_i + dy_min;
-							}
+						var dy_min, dy_max;
+						
+						dy_max = Math.sqrt((LAST_BIN_VALUE * LAST_BIN_VALUE) - (x_j * x_j)) | 0;
+						dy_min = 0;
+						if (-x_j < FIRST_BIN_VALUE) 
+							dy_min = Math.sqrt((FIRST_BIN_VALUE * FIRST_BIN_VALUE) - (x_j * x_j)) | 0;
+												
+						for (var y_j = dy_min; y_j != dy_max + 1; ++y_j) {
+														
+							var dist = Math.sqrt(y_j * y_j + x_j * x_j) | 0;
 							
-							var dist = Math.sqrt(Math.pow(x_i - x_j, 2) + Math.pow(y_i - y_j, 2)) | 0;
-							if (!((x_j < 0) || (y_j < 0))) {
-								var tmp = putToHisto(histo, dist, gsPixels[x_j + y_j * WIDTH]);
-							}
+							var tmp = putToHisto(histo, dist, gsPixels[(x_j + x_i) + (y_j + y_i) * WIDTH]);
+							
 							if (tmp > maximum) {
 								maximum = tmp;
 								hotCircle = { x: x_i, y: y_i };
@@ -168,7 +156,8 @@
 							}
 						}
 					}
-					
+					//delete histo;
+					//histo = null;
 				}
 			}
 			
