@@ -2,7 +2,6 @@
 <html>
 <head>
 	<title>MATSE</title>
-	<script src="jquery-1.11.3.min.js"></script>
 	<meta charset="UTF-8">
 </head>
 <body>
@@ -14,11 +13,11 @@
 		var render_id;
 		var WIDTH = 200;
 		var HEIGHT = 150;
-		var FIRST_BIN_VALUE = 20;
-		var LAST_BIN_VALUE = 25;
+		var FIRST_BIN_VALUE = 15;
+		var LAST_BIN_VALUE = 20;
 		
 		var NUMBER_OF_BINS = LAST_BIN_VALUE - FIRST_BIN_VALUE + 1;
-		
+		var $ = function (id){return document.getElementById(id);};
 		//var binWidth = 1;
 		// compute gradient using Sobel kernel [1 2 1] * [-1 0 1]^T
 		// dst: [gx,gy,...]
@@ -182,9 +181,9 @@
 			}
 		};
 	
-		$(function () {
-			var videoElement = $('#video').get(0);
-			var canvasElement = $('#canvas').get(0);
+		//$(function () {
+			var videoElement = $('video');
+			var canvasElement = $('canvas');
 			canvasElement.width = WIDTH;
 			canvasElement.height = HEIGHT;
 			var context = canvasElement.getContext('2d');
@@ -204,7 +203,7 @@
 				var time = new Date().getTime();
 				console.log(time - start);
 			};
-			$('#btn_start').click(function () {
+			$('btn_start').onclick = function () {
 				navigator.mozGetUserMedia({
 					video: true
 				},
@@ -217,11 +216,11 @@
 				function () {
 					alert('NO SUCCESS');
 				});
-			});
-			$('#btn_stop').click(function () {
+			};
+			$('btn_stop').onclick = function () {
 				cancelAnimationFrame(render_id);
-			});
-		});
+			};
+		//});
 	</script>
 </body>	
 </html>
